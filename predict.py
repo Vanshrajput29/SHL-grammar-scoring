@@ -11,38 +11,20 @@ Same pipeline as the leaderboard model, end to end on one file:
      Otherwise average it with the fine-tuned DeBERTa on the transcript -- models/deberta_final/
 Needs Apple Silicon for Whisper (mlx-whisper). Downloads ~3 GB of pretrained models on first run.
 """
-import sys, wave
+import sys
 from pathlib import Path
 
 import joblib
 import numpy as np
 import pandas as pd
 import torch
-from scipy.signal import resample_poly
 
 import features as F
 import transcribe as T
 
 DEVICE = "mps" if torch.backends.mps.is_available() else "cpu"
-SR, CHUNK = 16000, 16000 * 20
+SR, CHUNK = T.SR, T.SR * 20
 MODELS = Path(__file__).parent / "models"
-
-
-def load_audio(path):
-    """16 kHz mono float32 from a PCM WAV file (resampled if needed)."""
-    with wave.open(str(path)) as w:
-        assert w.getsampwidth() == 2, "expects 16-bit PCM WAV"
-        x = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(np.float32) / 32768
-        x, sr = x.reshape(-1, w.getnchannels()).mean(axis=1), w.getframerate()
-    return resample_poly(x, SR, sr).astype(np.float32) if sr != SR else x
-
-
-def transcribe(audio):
-    import mlx_whisper
-    r = mlx_whisper.transcribe(audio, path_or_hf_repo=T.MODEL, language="en", initial_prompt=T.PROMPT,
-                               condition_on_previous_text=False)
-    return {"text": r["text"].strip(), "duration": len(audio) / SR, "rms": float(np.sqrt((audio ** 2).mean())),
-            "segments": [{k: s[k] for k in ("avg_logprob", "no_speech_prob")} for s in r["segments"]]}
 
 
 def grammar_pairs(text):
@@ -88,8 +70,8 @@ def deberta_score(text):
 
 
 def score(path, verbose=False):
-    audio = load_audio(path)
-    rec = transcribe(audio)
+    audio = T.load_audio(path)
+    rec = T.transcribe_clip(audio)
     row = pd.DataFrame([F.asr_fields(rec)])
     H = F.handcrafted(row, gec_pairs=[grammar_pairs(rec["text"])])
     audio_model = joblib.load(MODELS / "audio_model.joblib")
