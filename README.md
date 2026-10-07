@@ -72,6 +72,13 @@ All numbers are 5-fold cross-validation on the training data, so every clip is p
 Things I tried that didn't make the final model: averaging several DeBERTa-base runs (tiny gain, the large model was better),
 and WavLM-large (no better on its own and worse inside the final ensemble, so I kept the smaller, faster base model).
 
+After v6 I also tried two bigger ideas on Kaggle's GPU, keeping a change only if it improved CV RMSE by about 0.01:
+- **Fine-tuning WavLM** itself (`kaggle_wavlm_finetune/`): it overfit on 769 clips, reaching 0.666 on its own versus
+  0.536 for the frozen version, and nested CV gave it zero weight in the ensemble.
+- **Averaging 3 DeBERTa-large runs** (`kaggle_deberta_large_seeds/`): ensemble CV 0.4963 → 0.4947, too small to matter.
+
+So the simpler frozen-audio model stayed. Details are in section 10 of the notebook.
+
 ## What's in this repo
 
 | file / folder | what it is |
@@ -109,7 +116,8 @@ I ran the heavy parts on Kaggle because my laptop (an M1 MacBook Air) was overhe
    kaggle kernels push -p kaggle_deberta_final  # DeBERTa-large trained on all clips (for predict.py)
    ```
    Also push `kaggle_deberta` and `kaggle_deberta_seeds` (the DeBERTa-base runs): the notebook compares them with the large
-   model in section 5. `kaggle_audio_large` (the WavLM-large comparison) is optional.
+   model in section 5. `kaggle_audio_large`, `kaggle_wavlm_finetune` and `kaggle_deberta_large_seeds` are the experiments that didn't make
+   the final model (WavLM-large, fine-tuned WavLM, extra DeBERTa-large runs); they're optional.
 3. **Download the outputs** with `kaggle kernels output <your-username>/<notebook-name> -p <folder>` into:
    `transcripts/` (unzip `transcripts.zip` there), `gec.json` (project root), `kaggle_out/audio/`, `kaggle_out/deberta/`,
    `kaggle_out/deberta_seeds/`, `kaggle_out/deberta_large/`, `kaggle_out/audio_large/`, and `models/deberta_final/`.
@@ -126,7 +134,7 @@ I ran the heavy parts on Kaggle because my laptop (an M1 MacBook Air) was overhe
 
 - **Whisper still cleans up some speech.** I can't measure exactly how much without human-written transcripts.
 - **Very few clips score 1–2**, so the model is least accurate there and tends to predict towards the middle.
-- **The audio model is frozen.** Fine-tuning WavLM itself, or training one model on audio and text together, is what I'd try next.
+- **More data before bigger audio models.** Fine-tuning WavLM overfit here; with more labelled audio it would be worth revisiting.
 - **The score-0 rule** catches 36 of 37 here, but it's based on very few examples.
 - **For production** I'd start from the audio model alone (CV RMSE 0.54 without Whisper or DeBERTa) and use lighter models;
   the notebook's last section has the details.
