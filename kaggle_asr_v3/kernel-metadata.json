@@ -1,0 +1,15 @@
+{
+  "id": "vanshrajput29/shl-grammar-whisper-large-v3",
+  "title": "SHL grammar - Whisper large-v3",
+  "code_file": "asr_v3_gec_kaggle.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "competition_sources": [
+    "shl-hiring-assessment-2026"
+  ],
+  "dataset_sources": [],
+  "kernel_sources": []
+}
