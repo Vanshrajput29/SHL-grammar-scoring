@@ -1,0 +1,20 @@
+# Competition rules: the data may not be redistributed. Nothing derived from the audio is committed
+# (audio, transcripts, grammar corrections, embeddings, per-clip predictions). Re-create them with the
+# kaggle_* scripts - see README.
+data/
+transcripts*/
+gec.json
+prompt_ab.txt
+kaggle_out/
+oof_*.csv
+test_*.csv
+transcribe.log
+
+# Trained models: the SVR stores training-clip feature vectors (derived data) and DeBERTa is 1.7 GB.
+# Re-create with train.py and kaggle_deberta_final/ (see README).
+models/
+
+.venv/
+__pycache__/
+.ipynb_checkpoints/
+.DS_Store

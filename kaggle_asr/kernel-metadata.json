@@ -1,0 +1,13 @@
+{
+  "id": "vanshrajput29/shl-grammar-whisper-transcription",
+  "title": "SHL grammar - Whisper transcription",
+  "code_file": "transcribe_kaggle.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "competition_sources": ["shl-hiring-assessment-2026"],
+  "dataset_sources": [],
+  "kernel_sources": []
+}

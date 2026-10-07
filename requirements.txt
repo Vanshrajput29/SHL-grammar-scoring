@@ -1,0 +1,14 @@
+# Local pipeline (notebook, features, Ridge). Python 3.14, Apple Silicon tested.
+numpy==2.5.3
+pandas==3.0.6
+scipy==1.18.1
+scikit-learn==1.9.1
+matplotlib==3.11.2
+sentence-transformers==6.1.0
+transformers==5.19.0
+torch==2.14.1
+jupyter==1.1.1
+nbformat==5.11.1
+ipykernel==7.4.0
+# Only for transcribe.py (local Whisper on Apple Silicon). The Kaggle notebooks install their own deps.
+mlx-whisper==0.4.3

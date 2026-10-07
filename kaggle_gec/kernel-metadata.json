@@ -1,0 +1,13 @@
+{
+  "id": "vanshrajput29/shl-grammar-error-correction",
+  "title": "SHL grammar - error correction",
+  "code_file": "gec_kaggle.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "competition_sources": [],
+  "dataset_sources": [],
+  "kernel_sources": ["vanshrajput29/shl-grammar-whisper-transcription"]
+}
