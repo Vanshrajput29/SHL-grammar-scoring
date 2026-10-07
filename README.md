@@ -1,7 +1,7 @@
 # Grammar Scoring from Spoken Audio
 
 This is my solution for the SHL Research Engineer Kaggle challenge (`shl-hiring-assessment-2026`).
-The task is to take an audio file of someone speaking English for 45–60 seconds and output a grammar score from 0 to 5.
+The task is to take an audio file of someone speaking English (mostly 45–60 seconds) and output a grammar score from 0 to 5.
 
 The full write-up, with plots and the training RMSE, is in **[`shl_grammar_scoring.ipynb`](shl_grammar_scoring.ipynb)**.
 This README is the short version.
