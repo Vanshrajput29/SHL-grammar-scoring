@@ -84,10 +84,13 @@ def score(path, verbose=False):
         d = deberta_score(rec["text"])
         final = 0.5 * r + 0.5 * d
     if verbose:
-        print(f"  transcript: {rec['text'][:150]}...\n  audio model {r:.2f} | text model {d if d is None else round(d, 2)}")
+        text_score = f"{d:.2f}" if d is not None else "not used (unintelligible)"
+        print(f"  transcript: {rec['text'][:150]}...\n  audio model {r:.2f} | text model {text_score}")
     return final
 
 
 if __name__ == "__main__":
-    for p in sys.argv[1:] or sys.exit(__doc__):
+    if not sys.argv[1:]:
+        sys.exit(__doc__)
+    for p in sys.argv[1:]:
         print(f"{p}: {score(p, verbose=True):.2f}")

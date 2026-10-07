@@ -83,10 +83,9 @@ def audio(df, split, path="kaggle_out/audio/audio_emb.npz"):
     return np.stack([x.mean(0) if x.ndim == 2 else x for x in v])  # large file is stored pre-averaged over layers
 
 
-def embed(texts, model=None):
+def embed(texts):
     from sentence_transformers import SentenceTransformer
-    model = model or SentenceTransformer(EMBED_MODEL)
-    return model.encode([t or " " for t in texts], batch_size=16, normalize_embeddings=True, show_progress_bar=False)
+    return SentenceTransformer(EMBED_MODEL).encode([t or " " for t in texts], batch_size=16, normalize_embeddings=True, show_progress_bar=False)
 
 
 if __name__ == "__main__":
