@@ -70,7 +70,7 @@ All numbers are 5-fold cross-validation on the training data, so every clip is p
   The step-by-step history is in the notebook.
 
 Things I tried that didn't make the final model: averaging several DeBERTa-base runs (tiny gain, the large model was better),
-and WavLM-large (better on its own, but no gain inside the final ensemble, so I kept the smaller, faster base model).
+and WavLM-large (no better on its own and worse inside the final ensemble, so I kept the smaller, faster base model).
 
 ## What's in this repo
 
@@ -107,8 +107,8 @@ I ran the heavy parts on Kaggle because my laptop (an M1 MacBook Air) was overhe
    kaggle kernels push -p kaggle_deberta_large  # DeBERTa-large 5-fold predictions
    kaggle kernels push -p kaggle_deberta_final  # DeBERTa-large trained on all clips (for predict.py)
    ```
-   (`kaggle_deberta` and `kaggle_deberta_seeds` are the base-model comparison runs shown in the notebook;
-   `kaggle_audio_large` is the WavLM-large comparison.)
+   Also push `kaggle_deberta` and `kaggle_deberta_seeds` (the DeBERTa-base runs): the notebook compares them with the large
+   model in section 5. `kaggle_audio_large` (the WavLM-large comparison) is optional.
 3. **Download the outputs** with `kaggle kernels output <your-username>/<notebook-name> -p <folder>` into:
    `transcripts/` (unzip `transcripts.zip` there), `gec.json` (project root), `kaggle_out/audio/`, `kaggle_out/deberta/`,
    `kaggle_out/deberta_seeds/`, `kaggle_out/deberta_large/`, `kaggle_out/audio_large/`, and `models/deberta_final/`.

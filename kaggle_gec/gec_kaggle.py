@@ -1,5 +1,5 @@
 """Grammar-correct every transcript sentence with CoEdIT (Kaggle GPU). Output: {key: [[original, corrected], ...]}."""
-import json, re
+import json, re, zipfile
 from pathlib import Path
 
 import torch
@@ -9,7 +9,6 @@ SRC = next(Path("/kaggle/input").rglob("transcripts.zip")).parent
 MODEL = "grammarly/coedit-large"
 INSTRUCTION = "Fix grammatical errors in this sentence: "
 
-import zipfile
 recs = {}
 with zipfile.ZipFile(SRC / "transcripts.zip") as z:
     for n in z.namelist():
