@@ -94,7 +94,7 @@ def deberta_score(text):
 
 def score(path, verbose=False):
     audio = T.load_audio(path)
-    if len(audio) < SR:  # the model was trained on 45-60 s clips; WavLM needs at least 1 s
+    if len(audio) < SR:  # training clips were 20-61 s (mostly 45-60 s); WavLM needs at least 1 s
         raise ValueError(f"{path}: clip is {len(audio) / SR:.2f} s long; need at least 1 s of audio")
     rec = T.transcribe_clip(audio)
     H = F.handcrafted(pd.DataFrame([F.asr_fields(rec)]), gec_pairs=[grammar_pairs(rec["text"])])
