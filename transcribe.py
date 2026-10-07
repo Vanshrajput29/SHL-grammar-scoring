@@ -17,7 +17,8 @@ PROMPT = "Umm, so I was, uh, I go to the market and, like, I buyed some... some 
 def load_audio(path):
     """16 kHz mono float32 from a 16-bit PCM WAV file (resampled if needed). Shared with predict.py."""
     with wave.open(str(path)) as w:
-        assert w.getsampwidth() == 2, f"expects 16-bit PCM WAV: {path}"
+        if w.getsampwidth() != 2:  # a real check, not an assert: asserts vanish under `python -O`
+            raise ValueError(f"expects 16-bit PCM WAV, got {8 * w.getsampwidth()}-bit: {path}")
         x = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16).astype(np.float32) / 32768
         x, sr = x.reshape(-1, w.getnchannels()).mean(axis=1), w.getframerate()
     return resample_poly(x, SR, sr).astype(np.float32) if sr != SR else x

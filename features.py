@@ -85,7 +85,8 @@ def audio(df, split, path="kaggle_out/audio/audio_emb.npz"):
 
 def embed(texts):
     from sentence_transformers import SentenceTransformer
-    return SentenceTransformer(EMBED_MODEL).encode([t or " " for t in texts], batch_size=16, normalize_embeddings=True, show_progress_bar=False)
+    return SentenceTransformer(EMBED_MODEL).encode([t or " " for t in texts], batch_size=16,
+                                                   normalize_embeddings=True, show_progress_bar=False)
 
 
 if __name__ == "__main__":

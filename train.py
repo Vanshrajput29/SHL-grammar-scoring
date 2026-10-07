@@ -34,6 +34,17 @@ def audio_model():
     return make_pipeline(StandardScaler(), SVR(C=3, epsilon=0.05))
 
 
+UNINTELLIGIBLE_BELOW = 1.0  # audio-model scores under the rubric's minimum (1) mean unintelligible / off-task speech
+
+
+def combine_scores(audio, text, w=0.5):
+    """The final scoring rule, shared by the notebook and predict.py.
+    Audio score below UNINTELLIGIBLE_BELOW -> keep the audio score (~0); otherwise w*audio + (1-w)*text.
+    `text` may be NaN where the text model was not run (it is never needed for unintelligible clips)."""
+    audio, text = np.asarray(audio, dtype=float), np.asarray(text, dtype=float)
+    return np.where((audio < UNINTELLIGIBLE_BELOW) | np.isnan(text), audio, w * audio + (1 - w) * np.nan_to_num(text))
+
+
 def evaluate(name, X, y, cv, make=model):
     oof = np.clip(cross_val_predict(make(), X, y, cv=cv), 0, 5)
     print(f"{name:<24} OOF rmse={rmse(y, oof):.4f}  pearson={pearsonr(y, oof)[0]:.4f}")

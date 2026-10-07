@@ -79,7 +79,8 @@ and WavLM-large (no better on its own and worse inside the final ensemble, so I 
 | `shl_grammar_scoring.ipynb` | the main notebook: explanation, plots, evaluation, final predictions, `predict.py` demo |
 | `predict.py` | **audio file in → score out**, running the whole pipeline end to end |
 | `features.py` | builds the features from transcripts (shared by training and `predict.py`) |
-| `train.py` | the audio model (SVR) and its cross-validation; saves `models/audio_model.joblib` |
+| `train.py` | the audio model (SVR), its cross-validation, and the final scoring rule (`combine_scores`) |
+| `test_pipeline.py` | fast checks of the scoring rule, audio loading and input validation (no data needed): `python test_pipeline.py` |
 | `transcribe.py` | runs Whisper locally on a Mac (Apple Silicon) |
 | `kaggle_*/` | scripts I ran on Kaggle's free GPU (Whisper, grammar correction, WavLM, DeBERTa) |
 | `submission.csv` | my final predictions for the test set |
@@ -114,6 +115,7 @@ I ran the heavy parts on Kaggle because my laptop (an M1 MacBook Air) was overhe
    `kaggle_out/deberta_seeds/`, `kaggle_out/deberta_large/`, `kaggle_out/audio_large/`, and `models/deberta_final/`.
 4. **Train the audio model and run the notebook:**
    ```bash
+   .venv/bin/python test_pipeline.py
    .venv/bin/python train.py
    .venv/bin/jupyter nbconvert --to notebook --execute shl_grammar_scoring.ipynb
    ```
