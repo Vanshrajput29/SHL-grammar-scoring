@@ -1,5 +1,6 @@
 """Audio model: SVR on WavLM audio embedding + hand-crafted + grammar-correction features.
 5-fold CV comparison against simpler Ridge baselines; saves models/audio_model.joblib; writes test_audio.csv.
+(The frozen sentence-embedding baselines are compared in the notebook only: computing them here took ~95% of the runtime.)
 
 Predictions cover the full 0-5 range. Label-0 clips (unintelligible / off-task speech) stay in training: the audio
 model scores (almost) all of them below 1 and every real speaker above 1, so the final ensemble uses
@@ -55,15 +56,12 @@ def main():
     train, test = F.load("train"), F.load("test")
     y = train.label.to_numpy()
     H_tr, H_te = F.handcrafted(train, "train"), F.handcrafted(test, "test")
-    E_tr = F.embed(train.text)
     A_tr, A_te = F.audio(train, "train"), F.audio(test, "test")
     base = [c for c in H_tr.columns if not c.startswith("gec_")]
 
     cv = KFold(5, shuffle=True, random_state=42)
     evaluate("handcrafted (no gec)", H_tr[base].to_numpy(), y, cv)
     evaluate("handcrafted + gec", H_tr.to_numpy(), y, cv)
-    evaluate("text embedding", E_tr, y, cv)
-    evaluate("handcrafted + text emb", np.hstack([H_tr.to_numpy(), E_tr]), y, cv)
     evaluate("audio (WavLM)", A_tr, y, cv)
     X_tr, X_te = np.hstack([A_tr, H_tr.to_numpy()]), np.hstack([A_te, H_te.to_numpy()])
     evaluate("audio + handcrafted Ridge", X_tr, y, cv)
