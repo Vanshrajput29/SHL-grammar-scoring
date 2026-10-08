@@ -1,0 +1,20 @@
+{
+  "id": "vanshrajput29/shl-grammar-whisper-encoder",
+  "title": "SHL grammar - whisper encoder",
+  "code_file": "whisper_encoder_kaggle.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "competition_sources": [
+    "shl-hiring-assessment-2026"
+  ],
+  "dataset_sources": [],
+  "kernel_sources": [
+    "vanshrajput29/shl-grammar-whisper-transcription",
+    "vanshrajput29/shl-grammar-error-correction",
+    "vanshrajput29/shl-grammar-audio-embeddings",
+    "vanshrajput29/shl-grammar-deberta-large"
+  ]
+}

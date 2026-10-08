@@ -89,6 +89,10 @@ After v6 I also tried several more ideas on Kaggle, keeping a change only if it 
 - **An LLM grammar judge** (Qwen2.5-7B-Instruct rating each transcript against SHL's rubric, zero-shot;
   `kaggle_llm_judge/`): the strongest single text feature I found (Spearman +0.60), but no gain in the ensemble, and nested
   CV gave it zero weight as a third model, since it overlaps with what DeBERTa already learned.
+- **Whisper's encoder** as a second audio embedding (`kaggle_whisper_encoder/`): worse (ensemble 0.5155).
+- **A learned blend** instead of 50/50 (0.667 × audio + 0.420 × text − 0.332, fitted with nested CV): the only post-v6 idea
+  with a real CV gain (0.4963 → 0.4884), but submitted as v8 it scored 0.3566 publicly against v6's 0.3510. It stretches
+  predictions toward the training spread, and the test set seems more tightly bunched, so v6 stayed.
 
 So the simpler frozen-audio model stayed. Details are in section 10 of the notebook.
 
@@ -130,7 +134,7 @@ I ran the heavy parts on Kaggle because my laptop (an M1 MacBook Air) was overhe
    ```
    Also push `kaggle_deberta` and `kaggle_deberta_seeds` (the DeBERTa-base runs): the notebook compares them with the large
    model in section 5. The other `kaggle_*` folders (`kaggle_audio_large`, `kaggle_wavlm_finetune`, `kaggle_deberta_large_seeds`, `kaggle_asr_v3`,
-   `kaggle_deberta_large_v3`, `kaggle_ctc_disagreement`, `kaggle_parakeet`, `kaggle_features_v2`, `kaggle_llm_judge`) are experiments that
+   `kaggle_deberta_large_v3`, `kaggle_ctc_disagreement`, `kaggle_parakeet`, `kaggle_features_v2`, `kaggle_llm_judge`, `kaggle_whisper_encoder`) are experiments that
    didn't make the final model (notebook section 10); they're optional.
 3. **Download the outputs** with `kaggle kernels output <your-username>/<notebook-name> -p <folder>` into:
    `transcripts/` (unzip `transcripts.zip` there), `gec.json` (project root), `kaggle_out/audio/`, `kaggle_out/deberta/`,
