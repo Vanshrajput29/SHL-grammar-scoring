@@ -34,6 +34,10 @@ train, test = pd.read_csv(DATA / "train.csv"), pd.read_csv(DATA / "test.csv")
 tr_audio = [load_wav(DATA / "train" / f) for f in train.filename]
 te_audio = [load_wav(DATA / "test" / f) for f in test.filename]
 y = train.label.to_numpy(np.float32)
+# Training batches are random crops of exactly CROP samples, so they never need padding - this relies on every
+# training clip being at least CROP long (the shortest is 20 s). Fail loudly if the data ever breaks that.
+if min(len(x) for x in tr_audio) < CROP:
+    raise ValueError("a training clip is shorter than the 15 s crop; batches would need padding + attention masks")
 fe = AutoFeatureExtractor.from_pretrained(MODEL)
 print(len(tr_audio), "train clips,", len(te_audio), "test clips", flush=True)
 
@@ -67,14 +71,17 @@ def random_crop(x):
 
 
 def predict(model, clips):
-    """Mean prediction over consecutive 15 s chunks (a final chunk shorter than 5 s is dropped unless it is the only one)."""
+    """Mean prediction over consecutive 15 s chunks (a final chunk shorter than 5 s is dropped unless it is the only one).
+    Each chunk is scored on its own: batching a shorter last chunk with full ones would zero-pad it, and the model
+    would then attend to and average in the padding (the first version did this; see notebook section 10)."""
     model.eval(); out = []
     with torch.no_grad():
         for x in clips:
             chunks = [x[s:s + CROP] for s in range(0, len(x), CROP)]
             chunks = [c for c in chunks if len(c) >= 5 * SR] or chunks[:1]
             with torch.autocast("cuda", dtype=torch.float16):
-                out.append(float(model(to_input(chunks)).float().mean()) * 5)
+                scores = [float(model(to_input([c])).float()) for c in chunks]
+            out.append(np.mean(scores) * 5)
     return np.clip(out, 0, 5)
 
 
