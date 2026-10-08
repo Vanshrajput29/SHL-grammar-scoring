@@ -66,6 +66,17 @@ def test_predict_rejects_clips_under_one_second():
             raise AssertionError("0.5 s clip was accepted")
 
 
+def test_split_pieces_overlap_and_cover_all_audio():
+    cut = lambda sec: T.split_pieces(np.arange(int(sec * T.SR)))
+    lengths = lambda sec: [len(p) / T.SR for p in cut(sec)]
+    assert lengths(6.5) == [6.5]                     # 10 s or less: one piece
+    assert lengths(23) == [10, 10, 13]               # starts at 0, 5, 10 s; the 3 s left over stretches the last piece
+    assert lengths(45) == [10] * 8                   # starts every 5 s: 0, 5, ..., 35 s
+    assert len(cut(61)) == 11 and lengths(61)[-1] == 11
+    for sec in (6.5, 23, 45, 52.3, 61):              # every sample is covered, nothing is dropped
+        assert np.unique(np.concatenate(cut(sec))).size == int(sec * T.SR)
+
+
 def test_gec_features_count_word_edits_only():
     g = F.gec_features([("I buyed some vegetables.", "I bought some vegetables."), ("It is good.", "It is good!")])
     assert g == {"gec_edit_rate": 1 / 7, "gec_changed_frac": 0.5}, g

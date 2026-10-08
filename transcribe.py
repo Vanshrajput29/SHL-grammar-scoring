@@ -24,6 +24,25 @@ def load_audio(path):
     return resample_poly(x, SR, sr).astype(np.float32) if sr != SR else x
 
 
+PIECE_S, HOP_S = 10, 5   # the audio model scores overlapping 10 s pieces, one starting every 5 s (see split_pieces)
+
+
+def split_pieces(x):
+    """Cut audio into overlapping ~10 s pieces for the audio model, one starting every 5 s. If what's left after the
+    last full piece is at least half a piece, one more piece ending at the end of the clip is added; otherwise the last
+    piece is stretched to the end. Audio of 10 s or less is a single piece. Same rule as kaggle_audio_pieces_variants/
+    ("p10hop5", where the training embeddings were made), so training and predict.py cut clips identically."""
+    piece, hop = PIECE_S * SR, HOP_S * SR
+    if len(x) <= piece:
+        return [x]
+    segs = [(s, s + piece) for s in range(0, len(x) - piece + 1, hop)]
+    if len(x) - segs[-1][1] >= piece // 2:
+        segs.append((len(x) - piece, len(x)))
+    else:
+        segs[-1] = (segs[-1][0], len(x))
+    return [x[a:b] for a, b in segs]
+
+
 def transcribe_clip(audio, model=MODEL):
     """Whisper transcript + ASR metadata for one clip. The single place the Whisper settings live,
     so training transcripts and predict.py can never drift apart."""
