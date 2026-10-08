@@ -83,6 +83,13 @@ def audio(df, split, path="kaggle_out/audio/audio_emb.npz"):
     return np.stack([x.mean(0) if x.ndim == 2 else x for x in v])  # large file is stored pre-averaged over layers
 
 
+def audio_pieces(df, split, path="kaggle_out/audio_pieces_variants/audio_pieces_p10hop5.npz"):
+    """WavLM-base-plus embedding of every overlapping ~10 s piece of each clip (transcribe.split_pieces; Kaggle GPU):
+    one array [n_pieces, 768] per clip, mean over time then over all 13 layers."""
+    P = np.load(path)
+    return [P[f"{split}_{Path(f).stem}"] for f in df.filename]
+
+
 def embed(texts):
     from sentence_transformers import SentenceTransformer
     return SentenceTransformer(EMBED_MODEL).encode([t or " " for t in texts], batch_size=16,

@@ -15,7 +15,7 @@ BOXES = {
     "wavlm":   (3.6, 1.4, 2.6, 1.1, "WavLM-base-plus (frozen)", "speech embedding:\nfluency, pauses, pronunciation", AUDIO, AUDIO_EDGE),
     "deberta": (6.6, 5.3, 2.4, 0.8, "DeBERTa-v3-large", "fine-tuned on transcripts", TEXT, TEXT_EDGE),
     "feats":   (6.6, 3.5, 2.4, 1.1, "Hand-made features", "from the transcript: speaking rate,\nrepeats, confidence + CoEdIT\ngrammar-edit rate", BOTH, INK),
-    "svr":     (6.6, 1.4, 2.4, 0.8, "SVR audio model", "WavLM embedding + features", AUDIO, AUDIO_EDGE),
+    "svr":     (6.6, 1.4, 2.4, 1.1, "SVR audio model", "scores each overlapping 10 s piece\n(piece + clip embedding + features);\nclip score = median over pieces", AUDIO, AUDIO_EDGE),
     "combine": (9.7, 3.3, 2.5, 1.3, "Combine", "audio score < 1  →  audio score\n(unintelligible speech)\notherwise  →  ½ audio + ½ text", BOTH, INK),
     "final":   (12.2, 3.3, 1.5, 1.0, "Final score", "0 – 5", BOTH, INK),
 }

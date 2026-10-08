@@ -5,8 +5,9 @@
 Same pipeline as the leaderboard model, end to end on one file:
   1. Whisper large-v3-turbo transcript (disfluent prompt)            -- transcribe.py settings
   2. CoEdIT grammar correction of each sentence -> edit-rate features
-  3. WavLM-base-plus embedding (mean over time and layers)
-  4. SVR audio model on [audio + hand-crafted features]             -- models/audio_model.joblib (train.py)
+  3. WavLM-base-plus embeddings (mean over time and layers): of the whole clip, and of each overlapping ~10 s piece
+  4. SVR audio model scores every piece on [piece emb, clip emb, hand-made features]; the clip's audio score is the
+     median over its pieces                                         -- models/audio_model.joblib (train.py)
   5. If the audio model says < 1 the clip is unintelligible -> return that score (~0) (train.combine_scores).
      Otherwise average it with the fine-tuned DeBERTa on the transcript -- models/deberta_final/
 Needs Apple Silicon for Whisper (mlx-whisper). Downloads ~3 GB of pretrained models on first run.
@@ -85,6 +86,19 @@ def wavlm_embedding(audio):
     return (sums / n).mean(0)
 
 
+def wavlm_piece_embeddings(audio):
+    """Same as kaggle_audio_pieces_variants/ (p10hop5): each overlapping ~10 s piece (transcribe.split_pieces) on its own,
+    mean over time, then layers."""
+    fe, m = _wavlm()
+    out = []
+    for seg in T.split_pieces(audio):
+        with torch.no_grad():
+            hs = torch.stack(m(fe(seg, sampling_rate=SR, return_tensors="pt").input_values.to(DEVICE),
+                               output_hidden_states=True).hidden_states)
+        out.append(hs[:, 0].mean(1).mean(0).cpu().numpy())
+    return np.stack(out)
+
+
 def deberta_score(text):
     tok, m = _deberta()
     with torch.no_grad():
@@ -101,8 +115,9 @@ def score(path, verbose=False):
     audio_model = _audio_model()
     if list(H.columns) != audio_model["columns"]:
         raise RuntimeError("feature columns differ from the ones the audio model was trained on - re-run train.py")
-    x = np.hstack([wavlm_embedding(audio)[None], H.to_numpy()])
-    r = float(np.clip(audio_model["model"].predict(x)[0], 0, 5))
+    clip_emb, h = wavlm_embedding(audio), H.to_numpy()[0]
+    rows = np.vstack([np.concatenate([p, clip_emb, h]) for p in wavlm_piece_embeddings(audio)])
+    r = float(np.clip(np.median(audio_model["model"].predict(rows)), 0, 5))   # clip score = median over pieces
     # The text model is only needed for intelligible speech (see train.combine_scores).
     d = deberta_score(rec["text"]) if r >= train.UNINTELLIGIBLE_BELOW else np.nan
     final = float(train.combine_scores(r, d))
