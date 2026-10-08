@@ -74,13 +74,18 @@ All numbers are 5-fold cross-validation on the training data, so every clip is p
 Things I tried that didn't make the final model: averaging several DeBERTa-base runs (tiny gain, the large model was better),
 and WavLM-large (no better on its own and worse inside the final ensemble, so I kept the smaller, faster base model).
 
-After v6 I also tried three bigger ideas on Kaggle's GPU, keeping a change only if it improved CV RMSE by about 0.01:
+After v6 I also tried several more ideas on Kaggle, keeping a change only if it improved CV RMSE by about 0.01:
 - **Fine-tuning WavLM** itself (`kaggle_wavlm_finetune/`): it overfit on 769 clips, reaching 0.666 on its own versus
   0.536 for the frozen version, and nested CV gave it zero weight in the ensemble.
 - **Averaging 3 DeBERTa-large runs** (`kaggle_deberta_large_seeds/`): ensemble CV 0.4963 → 0.4947, too small to matter.
+  I submitted it as v7 to check: public 0.3522 vs v6's 0.3510, so v6 stayed.
 - **Better transcripts** from Whisper large-v3 instead of turbo (`kaggle_asr_v3/`, `kaggle_deberta_large_v3/`): the grammar
   features got stronger on their own, but the full model didn't improve (best combination 0.4968), because WavLM already
   covers that signal and DeBERTa did worse on the noisier text.
+- **"What Whisper corrected":** disagreement between Whisper and models without a language model (wav2vec2, NVIDIA Parakeet;
+  `kaggle_ctc_disagreement/`, `kaggle_parakeet/`), plus **grammatical-complexity** and **error-type** features
+  (`kaggle_features_v2/`). Several of these track the score strongly (Parakeet disagreement: Spearman −0.48, close to the
+  grammar-correction rate's −0.52), but none improved the model (best 0.4956): they measure the same thing it already knows.
 
 So the simpler frozen-audio model stayed. Details are in section 10 of the notebook.
 
@@ -121,9 +126,9 @@ I ran the heavy parts on Kaggle because my laptop (an M1 MacBook Air) was overhe
    kaggle kernels push -p kaggle_deberta_final  # DeBERTa-large trained on all clips (for predict.py)
    ```
    Also push `kaggle_deberta` and `kaggle_deberta_seeds` (the DeBERTa-base runs): the notebook compares them with the large
-   model in section 5. `kaggle_audio_large`, `kaggle_wavlm_finetune`, `kaggle_deberta_large_seeds`, `kaggle_asr_v3` and `kaggle_deberta_large_v3`
-   are the experiments that didn't make the final model (WavLM-large, fine-tuned WavLM, extra DeBERTa-large runs,
-   Whisper large-v3 transcripts); they're optional.
+   model in section 5. The other `kaggle_*` folders (`kaggle_audio_large`, `kaggle_wavlm_finetune`, `kaggle_deberta_large_seeds`, `kaggle_asr_v3`,
+   `kaggle_deberta_large_v3`, `kaggle_ctc_disagreement`, `kaggle_parakeet`, `kaggle_features_v2`) are experiments that
+   didn't make the final model (notebook section 10); they're optional.
 3. **Download the outputs** with `kaggle kernels output <your-username>/<notebook-name> -p <folder>` into:
    `transcripts/` (unzip `transcripts.zip` there), `gec.json` (project root), `kaggle_out/audio/`, `kaggle_out/deberta/`,
    `kaggle_out/deberta_seeds/`, `kaggle_out/deberta_large/`, `kaggle_out/audio_large/`, and `models/deberta_final/`.
