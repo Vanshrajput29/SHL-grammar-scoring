@@ -12,7 +12,7 @@ python predict.py clip.wav      # audio file in -> score (0-5) out
 
 ## How I approached it
 
-![Pipeline: Whisper transcript feeds a fine-tuned DeBERTa (text model) and hand-made features; WavLM speech embeddings plus those features feed an SVR (audio model); the two scores are combined](pipeline.png)
+![Pipeline: Whisper transcript feeds a fine-tuned DeBERTa (text model) and hand-made features; WavLM speech embeddings of the clip and of each overlapping 10 s piece, plus those features, feed an SVR (audio model) that scores each piece and takes the median; the two scores are combined](pipeline.png)
 
 My first thought was that grammar is about *words*, so I should turn the audio into text and work from there.
 That worked okay, but the biggest jump actually came later, when I also used the audio itself.
@@ -39,6 +39,12 @@ I call this the **audio model**. I started with Ridge regression, but it can onl
 learn curved ones and did clearly better. I chose its settings with nested cross-validation (every fold picked the same ones),
 so they weren't tuned on my own validation scores. I also tried gradient boosting and random forests, which did worse.
 
+Later I found the biggest remaining limit: the audio model learned from just **769 rows**, one per clip. So I cut each clip
+into **overlapping 10-second pieces** (one every 5 s), each inheriting its clip's score: about **7,700 rows** from the same audio.
+Each piece is scored on [its own WavLM embedding, the whole clip's embedding, the clip's hand-made features], and the clip's
+audio score is the **median** of its pieces. Cross-validation always keeps all pieces of a clip in the same fold, so the model is
+never tested on a speaker it has already heard. This was the only idea after v6 that improved both my CV and public scores.
+
 **4. Fine-tuning DeBERTa on the transcripts.**
 I fine-tuned DeBERTa-v3-large to predict the score directly from the transcript. This is the **text model**.
 I trained for a fixed number of epochs, rather than picking the best epoch on the validation fold,
@@ -61,20 +67,23 @@ All numbers are 5-fold cross-validation on the training data, so every clip is p
 |---|---|---|---|
 | hand-made features only (Ridge) | 0.966 | 0.854 | 0.627 |
 | WavLM audio + hand-made features (Ridge) | 0.563 | 0.576 | 0.891 |
-| WavLM audio + hand-made features (**SVR**, audio model) | 0.536 | 0.543 | 0.903 |
+| WavLM audio + hand-made features (**SVR**, one row per clip; v6) | 0.536 | 0.543 | 0.903 |
+| same, trained on **overlapping 10 s pieces**, median (audio model) | 0.519 | 0.529 | 0.909 |
 | fine-tuned DeBERTa-v3-large (text model) | – | 0.599 | 0.815 |
-| **final: gate + 50/50 average** | **0.496** | **0.502** | **0.918** |
+| **final: gate + 50/50 average** | **0.486** | **0.496** | **0.921** |
 
-- **Training RMSE** (audio model fitted on all training data): **0.109**. It's much lower than the CV number because an SVR can fit
-  the points it was trained on very closely, which is exactly why I judge everything by cross-validation instead.
-- **Public leaderboard RMSE: 0.3510** (version 6, rank 25 when submitted). The competition evaluates with Pearson and RMSE;
-  the leaderboard ranks by RMSE, so I used RMSE to make decisions and checked that Pearson improved too.
-  The step-by-step history is in the notebook.
+- **Training RMSE** (audio model fitted on all training data): **0.060**. It's much lower than the CV number because an SVR can fit
+  the points it was trained on very closely (and each training clip is seen as several overlapping pieces), which is exactly
+  why I judge everything by cross-validation instead.
+- **Public leaderboard RMSE: 0.3466** (version 10). The path there: v6 0.3510 → v9 (non-overlapping pieces) 0.3477 → v10 0.3466.
+  The competition evaluates with Pearson and RMSE; the leaderboard ranks by RMSE, so I used RMSE to make decisions and checked
+  that Pearson improved too. The step-by-step history is in the notebook.
 
 Things I tried that didn't make the final model: averaging several DeBERTa-base runs (tiny gain, the large model was better),
 and WavLM-large (no better on its own and worse inside the final ensemble, so I kept the smaller, faster base model).
 
-After v6 I also tried several more ideas on Kaggle, keeping a change only if it improved CV RMSE by about 0.01:
+After v6 I also tried several more ideas on Kaggle. Only scoring pieces of each clip (above) improved both CV and the
+public score; these didn't:
 - **Fine-tuning WavLM** itself (`kaggle_wavlm_finetune/`): it overfit on 769 clips, reaching 0.666 on its own versus
   0.536 for the frozen version, and nested CV gave it zero weight in the ensemble.
 - **Averaging 3 DeBERTa-large runs** (`kaggle_deberta_large_seeds/`): ensemble CV 0.4963 → 0.4947, too small to matter.
@@ -92,11 +101,14 @@ After v6 I also tried several more ideas on Kaggle, keeping a change only if it 
 - **Whisper's encoder** as a second audio embedding (`kaggle_whisper_encoder/`): worse (ensemble 0.5155).
 - **Stronger regularization** of the audio model (`kaggle_regularization/`): tuning the SVR's `gamma` and compressing WavLM
   with PCA shrink its train/CV gap, but CV error doesn't change (0.536), so the gap isn't costing accuracy.
-- **A learned blend** instead of 50/50 (0.667 × audio + 0.420 × text − 0.332, fitted with nested CV): the only post-v6 idea
-  with a real CV gain (0.4963 → 0.4884), but submitted as v8 it scored 0.3566 publicly against v6's 0.3510. It stretches
-  predictions toward the training spread, and the test set seems more tightly bunched, so v6 stayed.
+- **A learned blend** instead of 50/50 (0.667 × audio + 0.420 × text − 0.332, fitted with nested CV): a real CV gain
+  (0.4963 → 0.4884), but submitted as v8 it scored 0.3566 publicly against v6's 0.3510. It stretches predictions toward the
+  training spread, and the test set seems more tightly bunched.
+- **Scores as ordered categories** (one logistic model per score step): no real gain; its small improvement came only from
+  the score-0 clips, and the test set has none.
+- **Other piece settings** (`kaggle_audio_pieces_variants/`): 5 s pieces and the mean were close; 15 s pieces were worse.
 
-So the simpler frozen-audio model stayed. Details are in section 10 of the notebook.
+Details are in section 10 of the notebook.
 
 ## What's in this repo
 
@@ -105,7 +117,7 @@ So the simpler frozen-audio model stayed. Details are in section 10 of the noteb
 | `shl_grammar_scoring.ipynb` | the main notebook: explanation, plots, evaluation, final predictions, `predict.py` demo |
 | `predict.py` | **audio file in → score out**, running the whole pipeline end to end |
 | `features.py` | builds the features from transcripts (shared by training and `predict.py`) |
-| `train.py` | the audio model (SVR), its cross-validation, and the final scoring rule (`combine_scores`) |
+| `train.py` | the audio model (SVR on overlapping 10 s pieces), its cross-validation, and the final scoring rule (`combine_scores`) |
 | `test_pipeline.py` | fast checks of the scoring rule, audio loading and input validation (no data needed): `python test_pipeline.py` |
 | `transcribe.py` | runs Whisper locally on a Mac (Apple Silicon) |
 | `kaggle_*/` | scripts I ran on Kaggle's free GPU (Whisper, grammar correction, WavLM, DeBERTa) |
@@ -131,15 +143,16 @@ I ran the heavy parts on Kaggle because my laptop (an M1 MacBook Air) was overhe
    kaggle kernels push -p kaggle_asr            # Whisper transcripts -> transcripts.zip
    kaggle kernels push -p kaggle_gec            # grammar correction -> gec.json
    kaggle kernels push -p kaggle_audio          # WavLM embeddings   -> audio_emb.npz
+   kaggle kernels push -p kaggle_audio_pieces_variants   # WavLM per 10 s piece -> audio_pieces_p10hop5.npz
    kaggle kernels push -p kaggle_deberta_large  # DeBERTa-large 5-fold predictions
    kaggle kernels push -p kaggle_deberta_final  # DeBERTa-large trained on all clips (for predict.py)
    ```
    Also push `kaggle_deberta` and `kaggle_deberta_seeds` (the DeBERTa-base runs): the notebook compares them with the large
-   model in section 5. The other `kaggle_*` folders (`kaggle_audio_large`, `kaggle_wavlm_finetune`, `kaggle_deberta_large_seeds`, `kaggle_asr_v3`,
+   model in section 5. The other `kaggle_*` folders (`kaggle_audio_pieces` (v9), `kaggle_audio_large`, `kaggle_wavlm_finetune`, `kaggle_deberta_large_seeds`, `kaggle_asr_v3`,
    `kaggle_deberta_large_v3`, `kaggle_ctc_disagreement`, `kaggle_parakeet`, `kaggle_features_v2`, `kaggle_llm_judge`, `kaggle_whisper_encoder`, `kaggle_regularization`) are experiments that
    didn't make the final model (notebook section 10); they're optional.
 3. **Download the outputs** with `kaggle kernels output <your-username>/<notebook-name> -p <folder>` into:
-   `transcripts/` (unzip `transcripts.zip` there), `gec.json` (project root), `kaggle_out/audio/`, `kaggle_out/deberta/`,
+   `transcripts/` (unzip `transcripts.zip` there), `gec.json` (project root), `kaggle_out/audio/`, `kaggle_out/audio_pieces_variants/`, `kaggle_out/deberta/`,
    `kaggle_out/deberta_seeds/`, `kaggle_out/deberta_large/`, `kaggle_out/audio_large/`, and `models/deberta_final/`.
 4. **Train the audio model and run the notebook:**
    ```bash
@@ -156,7 +169,7 @@ I ran the heavy parts on Kaggle because my laptop (an M1 MacBook Air) was overhe
 - **Very few clips score 1–2**, so the model is least accurate there and tends to predict towards the middle.
 - **More data before bigger audio models.** Fine-tuning WavLM overfit here; with more labelled audio it would be worth revisiting.
 - **The score-0 rule** catches 36 of 37 here, but it's based on very few examples.
-- **For production** I'd start from the audio model alone (CV RMSE 0.54 without Whisper or DeBERTa) and use lighter models;
+- **For production** I'd start from the audio model alone (CV RMSE 0.52 without DeBERTa) and use lighter models;
   the notebook's last section has the details.
 
 ## Note on tools
