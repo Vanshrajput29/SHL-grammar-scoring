@@ -12,6 +12,8 @@ python predict.py clip.wav      # audio file in -> score (0-5) out
 
 ## How I approached it
 
+![Pipeline: Whisper transcript feeds a fine-tuned DeBERTa (text model) and hand-made features; WavLM speech embeddings plus those features feed an SVR (audio model); the two scores are combined](pipeline.png)
+
 My first thought was that grammar is about *words*, so I should turn the audio into text and work from there.
 That worked okay, but the biggest jump actually came later, when I also used the audio itself.
 
