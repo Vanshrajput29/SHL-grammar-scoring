@@ -119,6 +119,7 @@ public score; these didn't:
 - **Fine-tuning an LLM** (Qwen2.5-3B with LoRA; `kaggle_llm_lora/`): worse than DeBERTa (0.682 on its own vs 0.599, even after a second run with longer, steadier training).
 - **A second speech encoder**, w2v-BERT 2.0, next to WavLM in every piece (`kaggle_audio_w2vbert/`): ensemble CV 0.4822 →
   0.4762, better on all 5 splits, but as v12 it scored 0.3569 publicly. **Pseudo-labelling** the test clips: +0.001, too small.
+- **Averaging the v10 and v12 audio models** (v13): CV 0.4822 → 0.4774, better on all 5 splits; public 0.3498.
 
 **Why CV stopped predicting the leaderboard.** A simple classifier tells training clips from test clips with AUC ≈ 0.83
 (0.5 would mean no difference), so the test audio differs in ways cross-validation on training clips can't see. That's also
@@ -127,6 +128,11 @@ score, so I stopped there instead of tuning against a ~100-clip public set. One 
 half the test clips are 45–55 s long, where v10 over-predicts by ~0.16 in CV (shorter training clips come from lower-scoring
 speakers). Giving the model the clip's duration, or weighting training clips to the test's length mix, barely changed that
 (best: 0.5153 → 0.5136 on length-weighted CV), so I left it documented rather than guessing a correction.
+
+**Final picks.** The public leaderboard uses 60% of the test set (~130 clips); the final ranking uses the other 40% (~86
+clips), and Kaggle keeps the better of two chosen submissions. I picked **v10** (best public score, and the model `predict.py`
+runs) and **v13** (best-validated: better than v10 on all 5 CV splits, only 0.003 behind publicly, a gap 86 other clips could
+easily reverse).
 
 Details are in sections 10 and 10b of the notebook.
 
