@@ -120,6 +120,9 @@ public score; these didn't:
 - **A second speech encoder**, w2v-BERT 2.0, next to WavLM in every piece (`kaggle_audio_w2vbert/`): ensemble CV 0.4822 →
   0.4762, better on all 5 splits, but as v12 it scored 0.3569 publicly. **Pseudo-labelling** the test clips: +0.001, too small.
 - **Averaging the v10 and v12 audio models** (v13): CV 0.4822 → 0.4774, better on all 5 splits; public 0.3498.
+- **Test-style training audio** (v14; `kaggle_audio_pauses/`): test speakers pause about half as often, so I re-cut every
+  training clip with the test's pause pattern and trained on both versions. On pause-shortened validation clips it beat v10
+  on all 5 splits (0.4885 vs 0.4959), but it scored 0.3563 publicly.
 
 **Why CV stopped predicting the leaderboard.** A simple classifier tells training clips from test clips with AUC ≈ 0.83
 (0.5 would mean no difference), so the test audio differs in ways cross-validation on training clips can't see. That's also
@@ -128,6 +131,11 @@ score, so I stopped there instead of tuning against a ~100-clip public set. One 
 half the test clips are 45–55 s long, where v10 over-predicts by ~0.16 in CV (shorter training clips come from lower-scoring
 speakers). Giving the model the clip's duration, or weighting training clips to the test's length mix, barely changed that
 (best: 0.5153 → 0.5136 on length-weighted CV), so I left it documented rather than guessing a correction.
+
+**The winner's curse.** v10 was picked *because* it had the best public score among about ten submissions, and with ~130
+public clips the top scorer is usually a bit lucky. So v10's 0.3466 is probably optimistic, and every challenger was measured
+against an inflated bar: five ideas that beat v10 on all 5 CV splits each lost publicly by a similar small margin. The
+private 40% is a fresh sample, and it decides.
 
 **Final picks.** The public leaderboard uses 60% of the test set (~130 clips); the final ranking uses the other 40% (~86
 clips), and Kaggle keeps the better of two chosen submissions. I picked **v10** (best public score, and the model `predict.py`
@@ -175,7 +183,7 @@ I ran the heavy parts on Kaggle because my laptop (an M1 MacBook Air) was overhe
    ```
    Also push `kaggle_deberta` and `kaggle_deberta_seeds` (the DeBERTa-base runs): the notebook compares them with the large
    model in section 5. The other `kaggle_*` folders (`kaggle_audio_pieces` (v9), `kaggle_audio_large`, `kaggle_wavlm_finetune`, `kaggle_deberta_large_seeds`, `kaggle_asr_v3`,
-   `kaggle_deberta_large_v3`, `kaggle_ctc_disagreement`, `kaggle_parakeet`, `kaggle_features_v2`, `kaggle_llm_judge`, `kaggle_whisper_encoder`, `kaggle_regularization`, `kaggle_deberta_windows`, `kaggle_audio_augment`, `kaggle_deberta_both_asr`, `kaggle_llm_lora`, `kaggle_audio_w2vbert`) are experiments that
+   `kaggle_deberta_large_v3`, `kaggle_ctc_disagreement`, `kaggle_parakeet`, `kaggle_features_v2`, `kaggle_llm_judge`, `kaggle_whisper_encoder`, `kaggle_regularization`, `kaggle_deberta_windows`, `kaggle_audio_augment`, `kaggle_deberta_both_asr`, `kaggle_llm_lora`, `kaggle_audio_w2vbert`, `kaggle_audio_pauses`) are experiments that
    didn't make the final model (notebook section 10); they're optional.
 3. **Download the outputs** with `kaggle kernels output <your-username>/<notebook-name> -p <folder>` into:
    `transcripts/` (unzip `transcripts.zip` there), `gec.json` (project root), `kaggle_out/audio/`, `kaggle_out/audio_pieces_variants/`, `kaggle_out/deberta/`,
