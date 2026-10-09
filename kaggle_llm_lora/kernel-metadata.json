@@ -1,0 +1,17 @@
+{
+  "id": "vanshrajput29/shl-grammar-llm-lora",
+  "title": "SHL grammar - LLM LoRA",
+  "code_file": "llm_lora_kaggle.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "competition_sources": [
+    "shl-hiring-assessment-2026"
+  ],
+  "dataset_sources": [],
+  "kernel_sources": [
+    "vanshrajput29/shl-grammar-whisper-transcription"
+  ]
+}

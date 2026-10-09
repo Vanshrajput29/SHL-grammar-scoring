@@ -114,8 +114,18 @@ public score; these didn't:
 - **Re-checking the 50/50 blend** after v10: nested CV picked 0.65 for audio (CV 0.4822 → 0.4765), but it scored 0.3604
   publicly. In CV each clip's text score comes from one DeBERTa model, while on the test set it's the average of five,
   which is more accurate, so CV underrates the text model. That's likely why v8's learned blend failed too.
+- **DeBERTa trained on both transcripts** (Whisper turbo and large-v3; `kaggle_deberta_both_asr/`): text error 0.599 → 0.590,
+  but most of the ensemble gain came from averaging two models, and on the test set the two agree at r = 0.993.
+- **Fine-tuning an LLM** (Qwen2.5-3B with LoRA; `kaggle_llm_lora/`): worse than DeBERTa (0.682 on its own vs 0.599, even after a second run with longer, steadier training).
+- **A second speech encoder**, w2v-BERT 2.0, next to WavLM in every piece (`kaggle_audio_w2vbert/`): ensemble CV 0.4822 →
+  0.4762, better on all 5 splits, but as v12 it scored 0.3569 publicly. **Pseudo-labelling** the test clips: +0.001, too small.
 
-Details are in section 10 of the notebook.
+**Why CV stopped predicting the leaderboard.** A simple classifier tells training clips from test clips with AUC ≈ 0.83
+(0.5 would mean no difference), so the test audio differs in ways cross-validation on training clips can't see. That's also
+why every version scores ~0.35 publicly against ~0.49 in CV. After v10, all three changes that improved CV lost on the public
+score, so I stopped there instead of tuning against a ~100-clip public set.
+
+Details are in sections 10 and 10b of the notebook.
 
 ## What's in this repo
 
@@ -156,7 +166,7 @@ I ran the heavy parts on Kaggle because my laptop (an M1 MacBook Air) was overhe
    ```
    Also push `kaggle_deberta` and `kaggle_deberta_seeds` (the DeBERTa-base runs): the notebook compares them with the large
    model in section 5. The other `kaggle_*` folders (`kaggle_audio_pieces` (v9), `kaggle_audio_large`, `kaggle_wavlm_finetune`, `kaggle_deberta_large_seeds`, `kaggle_asr_v3`,
-   `kaggle_deberta_large_v3`, `kaggle_ctc_disagreement`, `kaggle_parakeet`, `kaggle_features_v2`, `kaggle_llm_judge`, `kaggle_whisper_encoder`, `kaggle_regularization`, `kaggle_deberta_windows`, `kaggle_audio_augment`) are experiments that
+   `kaggle_deberta_large_v3`, `kaggle_ctc_disagreement`, `kaggle_parakeet`, `kaggle_features_v2`, `kaggle_llm_judge`, `kaggle_whisper_encoder`, `kaggle_regularization`, `kaggle_deberta_windows`, `kaggle_audio_augment`, `kaggle_deberta_both_asr`, `kaggle_llm_lora`, `kaggle_audio_w2vbert`) are experiments that
    didn't make the final model (notebook section 10); they're optional.
 3. **Download the outputs** with `kaggle kernels output <your-username>/<notebook-name> -p <folder>` into:
    `transcripts/` (unzip `transcripts.zip` there), `gec.json` (project root), `kaggle_out/audio/`, `kaggle_out/audio_pieces_variants/`, `kaggle_out/deberta/`,
@@ -178,6 +188,8 @@ I ran the heavy parts on Kaggle because my laptop (an M1 MacBook Air) was overhe
 - **Very few clips score 1–2**, so the model is least accurate there and tends to predict towards the middle.
 - **More data before bigger audio models.** Fine-tuning WavLM overfit here; with more labelled audio it would be worth revisiting.
 - **The score-0 rule** catches 36 of 37 here, but it's based on very few examples.
+- **Training and test audio differ.** With more audio like the test set, even unscored, I'd first find out what differs
+  (microphones, prompts, speakers) and build validation around it, before trying more models.
 - **For production** I'd start from the audio model alone (CV RMSE 0.52 without DeBERTa) and use lighter models;
   the notebook's last section has the details.
 

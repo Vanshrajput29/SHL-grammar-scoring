@@ -1,0 +1,18 @@
+{
+  "id": "vanshrajput29/shl-grammar-deberta-both-asr",
+  "title": "SHL grammar - DeBERTa both ASR",
+  "code_file": "finetune_kaggle.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "competition_sources": [
+    "shl-hiring-assessment-2026"
+  ],
+  "dataset_sources": [],
+  "kernel_sources": [
+    "vanshrajput29/shl-grammar-whisper-transcription",
+    "vanshrajput29/shl-grammar-whisper-large-v3"
+  ]
+}
