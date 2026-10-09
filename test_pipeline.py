@@ -34,6 +34,25 @@ def test_combine_scores_gate_and_blend():
     assert np.allclose(out, [0.2, 3.5, 3.5]), out
 
 
+def test_fast_svr_matches_sklearn():
+    # train.ScaledRbfSVR computes the RBF kernel as one matrix product; it must be the same model as sklearn's pipeline.
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.svm import SVR
+    rng = np.random.default_rng(0)
+    X, y = rng.normal(size=(300, 20)) * rng.uniform(0.1, 5, 20), rng.uniform(0, 5, 300)
+    m = train.audio_model().fit(X, y)
+    ref = make_pipeline(StandardScaler(), SVR(C=m.C, epsilon=m.epsilon)).fit(X, y)
+    Xn = rng.normal(size=(50, 20))
+    assert np.allclose(m.predict(Xn), ref.predict(Xn), atol=1e-9)
+    # predict_pieces: median per clip, for clips with different numbers of pieces
+    pieces = [rng.normal(size=(k, 10)) for k in (1, 3, 4)]
+    A, H = rng.normal(size=(3, 6)), rng.normal(size=(3, 4))
+    clips = [2, 0, 1]
+    want = [np.clip(np.median(m.predict(train.piece_rows(pieces, A, H, [i]))), 0, 5) for i in clips]
+    assert np.allclose(train.predict_pieces(m, pieces, A, H, clips), want, atol=1e-9)
+
+
 def test_load_audio_resamples_and_downmixes():
     with tempfile.TemporaryDirectory() as d:
         tone = 0.5 * np.sin(2 * np.pi * 440 * np.arange(44100 * 2) / 44100)

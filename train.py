@@ -17,6 +17,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import pearsonr
 from sklearn.linear_model import RidgeCV
+from sklearn.metrics.pairwise import rbf_kernel
 from sklearn.model_selection import KFold, cross_val_predict
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
@@ -39,10 +40,30 @@ def clip_svr():
     return make_pipeline(StandardScaler(), SVR(C=3, epsilon=0.05))
 
 
+class ScaledRbfSVR:
+    """The same model as make_pipeline(StandardScaler(), SVR(C, epsilon)) with the default RBF kernel and gamma="scale"
+    (predictions agree to ~1e-13), but ~6x faster to fit and ~25x faster to predict on thousands of rows: the kernel is
+    computed as one matrix product instead of libsvm's pair-by-pair loop. Only the support vectors are kept."""
+
+    def __init__(self, C, epsilon):
+        self.C, self.epsilon = C, epsilon
+
+    def fit(self, X, y):
+        self.scaler = StandardScaler().fit(X)
+        Z = self.scaler.transform(X)
+        self.gamma = 1 / (Z.shape[1] * Z.var())  # what SVR's gamma="scale" uses
+        svr = SVR(kernel="precomputed", C=self.C, epsilon=self.epsilon).fit(rbf_kernel(Z, gamma=self.gamma), y)
+        self.support_vectors, self.dual_coef, self.intercept = Z[svr.support_], svr.dual_coef_[0], svr.intercept_[0]
+        return self
+
+    def predict(self, X):
+        return rbf_kernel(self.scaler.transform(X), self.support_vectors, gamma=self.gamma) @ self.dual_coef + self.intercept
+
+
 def audio_model():
     """Final audio model, trained on pieces. Nested CV with clip-grouped inner and outer folds (on 10 s pieces) picked
     C=1, epsilon=0.05 in 3 of 5 outer folds (C=3 in the other 2): with many more rows, a more regularised SVR."""
-    return make_pipeline(StandardScaler(), SVR(C=1, epsilon=0.05))
+    return ScaledRbfSVR(C=1, epsilon=0.05)
 
 
 def piece_rows(pieces, A, H, clips):
@@ -57,7 +78,8 @@ def fit_pieces(pieces, A, H, y, clips):
 
 def predict_pieces(m, pieces, A, H, clips):
     """Clip score = median of its pieces' predictions (less sensitive to one odd piece than the mean), clipped to 0-5."""
-    return np.clip([np.median(m.predict(piece_rows(pieces, A, H, [i]))) for i in clips], 0, 5)
+    p = m.predict(piece_rows(pieces, A, H, clips))
+    return np.clip([np.median(s) for s in np.split(p, np.cumsum([len(pieces[i]) for i in clips])[:-1])], 0, 5)
 
 
 def pieces_cv(pieces, A, H, y, cv):
@@ -118,4 +140,5 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import train  # run via the module so the saved model pickles as train.ScaledRbfSVR, which predict.py can load
+    train.main()

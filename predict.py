@@ -2,7 +2,7 @@
 
     python predict.py clip.wav [more.wav ...]
 
-Same pipeline as the leaderboard model, end to end on one file:
+Same pipeline as the leaderboard model, end to end:
   1. Whisper large-v3-turbo transcript (disfluent prompt)            -- transcribe.py settings
   2. CoEdIT grammar correction of each sentence -> edit-rate features
   3. WavLM-base-plus embeddings (mean over time and layers): of the whole clip, and of each overlapping ~10 s piece
@@ -10,8 +10,10 @@ Same pipeline as the leaderboard model, end to end on one file:
      median over its pieces                                         -- models/audio_model.joblib (train.py)
   5. If the audio model says < 1 the clip is unintelligible -> return that score (~0) (train.combine_scores).
      Otherwise average it with the fine-tuned DeBERTa on the transcript -- models/deberta_final/
+Steps run one model at a time (each model handles every file, then is freed), so only one big model is in memory at once.
 Needs Apple Silicon for Whisper (mlx-whisper). Downloads ~3 GB of pretrained models on first run.
 """
+import gc
 import sys
 from functools import lru_cache
 from pathlib import Path
@@ -30,7 +32,7 @@ SR, CHUNK = T.SR, T.SR * 20
 MODELS = Path(__file__).parent / "models"
 
 
-# Each model is loaded once per process and reused, so scoring many files doesn't reload ~5 GB of weights each time.
+# Each model is loaded once per call to score_many, used for every file, then freed with _free.
 @lru_cache(maxsize=None)
 def _coedit():
     from transformers import AutoTokenizer, T5ForConditionalGeneration
@@ -106,29 +108,51 @@ def deberta_score(text):
     return float(np.clip(p * 4 + 1, 1, 5))  # trained on (score - 1) / 4
 
 
-def score(path, verbose=False):
-    audio = T.load_audio(path)
-    if len(audio) < SR:  # training clips were 20-61 s (mostly 45-60 s); WavLM needs at least 1 s
-        raise ValueError(f"{path}: clip is {len(audio) / SR:.2f} s long; need at least 1 s of audio")
-    rec = T.transcribe_clip(audio)
-    H = F.handcrafted(pd.DataFrame([F.asr_fields(rec)]), gec_pairs=[grammar_pairs(rec["text"])])
+def _free(loader=None):
+    """Drop a model before the next one loads: all four together (~6-7 GB) don't fit next to the OS in 8 GB of RAM, and
+    swapping to disk made scoring one clip take a minute or more."""
+    if loader is None:
+        sys.modules["mlx_whisper.transcribe"].ModelHolder.model = None   # mlx-whisper keeps its last model here
+    else:
+        loader.cache_clear()
+    gc.collect()
+    if DEVICE == "mps":
+        torch.mps.empty_cache()
+
+
+def score_many(paths, verbose=False):
+    audios = [T.load_audio(p) for p in paths]
+    for p, a in zip(paths, audios):
+        if len(a) < SR:  # training clips were 20-61 s (mostly 45-60 s); WavLM needs at least 1 s
+            raise ValueError(f"{p}: clip is {len(a) / SR:.2f} s long; need at least 1 s of audio")
+    recs = [T.transcribe_clip(a) for a in audios]; _free()
+    pairs = [grammar_pairs(r["text"]) for r in recs]; _free(_coedit)
+    H = F.handcrafted(pd.DataFrame([F.asr_fields(r) for r in recs]), gec_pairs=pairs)
     audio_model = _audio_model()
     if list(H.columns) != audio_model["columns"]:
         raise RuntimeError("feature columns differ from the ones the audio model was trained on - re-run train.py")
-    clip_emb, h = wavlm_embedding(audio), H.to_numpy()[0]
-    rows = np.vstack([np.concatenate([p, clip_emb, h]) for p in wavlm_piece_embeddings(audio)])
-    r = float(np.clip(np.median(audio_model["model"].predict(rows)), 0, 5))   # clip score = median over pieces
+    embs = [(wavlm_embedding(a), wavlm_piece_embeddings(a)) for a in audios]; _free(_wavlm)
+    r = []
+    for (clip_emb, pieces), h in zip(embs, H.to_numpy()):
+        rows = np.vstack([np.concatenate([p, clip_emb, h]) for p in pieces])
+        r.append(np.clip(np.median(audio_model["model"].predict(rows)), 0, 5))   # clip score = median over pieces
+    r = np.array(r)
     # The text model is only needed for intelligible speech (see train.combine_scores).
-    d = deberta_score(rec["text"]) if r >= train.UNINTELLIGIBLE_BELOW else np.nan
-    final = float(train.combine_scores(r, d))
+    d = np.array([deberta_score(rec["text"]) if x >= train.UNINTELLIGIBLE_BELOW else np.nan for x, rec in zip(r, recs)])
+    _free(_deberta)
+    final = train.combine_scores(r, d)
     if verbose:
-        text_score = "not used (unintelligible)" if np.isnan(d) else f"{d:.2f}"
-        print(f"  transcript: {rec['text'][:150]}...\n  audio model {r:.2f} | text model {text_score}")
-    return final
+        for p, rec, x, t, f in zip(paths, recs, r, d, final):
+            text_score = "not used (unintelligible)" if np.isnan(t) else f"{t:.2f}"
+            print(f"{p}: {f:.2f}\n  transcript: {rec['text'][:150]}...\n  audio model {x:.2f} | text model {text_score}")
+    return [float(f) for f in final]
+
+
+def score(path, verbose=False):
+    return score_many([path], verbose)[0]
 
 
 if __name__ == "__main__":
     if not sys.argv[1:]:
         sys.exit(__doc__)
-    for p in sys.argv[1:]:
-        print(f"{p}: {score(p, verbose=True):.2f}")
+    score_many(sys.argv[1:], verbose=True)
