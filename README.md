@@ -168,7 +168,9 @@ I ran the heavy parts on Kaggle because my laptop (an M1 MacBook Air) was overhe
    .venv/bin/jupyter nbconvert --to notebook --execute shl_grammar_scoring.ipynb
    ```
 5. **Score any audio file:** `.venv/bin/python predict.py clip.wav` (needs Apple Silicon for local Whisper;
-   it downloads about 3 GB of pretrained models the first time).
+   it downloads about 3 GB of pretrained models the first time). To score many files, pass them all in one call
+   (`predict.py a.wav b.wav ...`): each model loads once, scores every file, and is freed before the next one loads, so
+   the first file takes about a minute (mostly loading) and each extra file about 6 s on my 8 GB M1.
 
 ## What I'd improve with more time
 
