@@ -123,7 +123,10 @@ public score; these didn't:
 **Why CV stopped predicting the leaderboard.** A simple classifier tells training clips from test clips with AUC ≈ 0.83
 (0.5 would mean no difference), so the test audio differs in ways cross-validation on training clips can't see. That's also
 why every version scores ~0.35 publicly against ~0.49 in CV. After v10, all three changes that improved CV lost on the public
-score, so I stopped there instead of tuning against a ~100-clip public set.
+score, so I stopped there instead of tuning against a ~100-clip public set. One concrete difference is clip length: about
+half the test clips are 45–55 s long, where v10 over-predicts by ~0.16 in CV (shorter training clips come from lower-scoring
+speakers). Giving the model the clip's duration, or weighting training clips to the test's length mix, barely changed that
+(best: 0.5153 → 0.5136 on length-weighted CV), so I left it documented rather than guessing a correction.
 
 Details are in sections 10 and 10b of the notebook.
 
