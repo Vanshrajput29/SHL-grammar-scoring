@@ -1,0 +1,13 @@
+{
+  "id": "vanshrajput29/shl-grammar-tune-speaker",
+  "title": "SHL grammar - tune speaker",
+  "code_file": "tune_speaker_kaggle.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_internet": false,
+  "competition_sources": [],
+  "dataset_sources": ["vanshrajput29/shl-grammar-eval-inputs", "vanshrajput29/shl-grammar-speaker-groups"],
+  "kernel_sources": []
+}
