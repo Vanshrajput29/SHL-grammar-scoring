@@ -1,9 +1,11 @@
 """Audio model: SVR trained on overlapping ~10 s pieces of each clip (one every 5 s). Each piece's row is [piece WavLM
 embedding, whole-clip WavLM embedding, hand-crafted + grammar-correction features of the clip]; it inherits the clip's
-score, and a clip's prediction is the MEDIAN over its pieces. ~7,700 training rows instead of 769 (v10; v9 used
-non-overlapping pieces and the mean, v6 one row per clip).
-CV always splits by CLIP, so pieces of one clip never sit in both train and validation.
+score, and a clip's prediction is the MEDIAN over its pieces. ~7,700 training rows instead of 769 (v10/v15; v9 used
+non-overlapping pieces and the mean, v6 one row per clip). v15 = v10 with a smoother kernel (see audio_model).
+CV always keeps all pieces of a clip, and all clips of a speaker, on the same side.
 5-fold CV comparison against simpler baselines; saves models/audio_model.joblib; writes test_audio.csv.
+CV is grouped by SPEAKER (speaker_groups): many training speakers answered several questions, usually with the same score,
+and the test speakers are all new, so splitting by clip let models score a validation clip by recognising the voice.
 (The frozen sentence-embedding baselines are compared in the notebook only: computing them here took ~95% of the runtime.)
 
 Predictions cover the full 0-5 range. Label-0 clips (unintelligible / off-task speech) stay in training: the audio
@@ -18,7 +20,9 @@ import pandas as pd
 from scipy.stats import pearsonr
 from sklearn.linear_model import RidgeCV
 from sklearn.metrics.pairwise import rbf_kernel
-from sklearn.model_selection import KFold, cross_val_predict
+from scipy.sparse import csr_matrix
+from scipy.sparse.csgraph import connected_components
+from sklearn.model_selection import GroupKFold, KFold, cross_val_predict
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVR
@@ -45,13 +49,13 @@ class ScaledRbfSVR:
     (predictions agree to ~1e-13), but ~6x faster to fit and ~25x faster to predict on thousands of rows: the kernel is
     computed as one matrix product instead of libsvm's pair-by-pair loop. Only the support vectors are kept."""
 
-    def __init__(self, C, epsilon):
-        self.C, self.epsilon = C, epsilon
+    def __init__(self, C, epsilon, gamma_scale=1.0):
+        self.C, self.epsilon, self.gamma_scale = C, epsilon, gamma_scale
 
     def fit(self, X, y):
         self.scaler = StandardScaler().fit(X)
         Z = self.scaler.transform(X)
-        self.gamma = 1 / (Z.shape[1] * Z.var())  # what SVR's gamma="scale" uses
+        self.gamma = self.gamma_scale / (Z.shape[1] * Z.var())  # gamma_scale=1 is SVR's gamma="scale"
         svr = SVR(kernel="precomputed", C=self.C, epsilon=self.epsilon).fit(rbf_kernel(Z, gamma=self.gamma), y)
         self.support_vectors, self.dual_coef, self.intercept = Z[svr.support_], svr.dual_coef_[0], svr.intercept_[0]
         return self
@@ -61,9 +65,10 @@ class ScaledRbfSVR:
 
 
 def audio_model():
-    """Final audio model, trained on pieces. Nested CV with clip-grouped inner and outer folds (on 10 s pieces) picked
-    C=1, epsilon=0.05 in 3 of 5 outer folds (C=3 in the other 2): with many more rows, a more regularised SVR."""
-    return ScaledRbfSVR(C=1, epsilon=0.05)
+    """Final audio model (v15), trained on pieces. C=1, epsilon=0.05 as in v10, with a smoother kernel (half of
+    sklearn's default gamma): re-tuned with speaker-grouped CV, which v10's settings were not, a wider kernel generalises
+    better to new speakers (ensemble CV on the 1-5 clips 0.5339 vs 0.5362, better on 3/3 splits; public 0.3428 vs 0.3466)."""
+    return ScaledRbfSVR(C=1, epsilon=0.05, gamma_scale=0.5)
 
 
 def piece_rows(pieces, A, H, clips):
@@ -82,10 +87,29 @@ def predict_pieces(m, pieces, A, H, clips):
     return np.clip([np.median(s) for s in np.split(p, np.cumsum([len(pieces[i]) for i in clips])[:-1])], 0, 5)
 
 
-def pieces_cv(pieces, A, H, y, cv):
-    """Out-of-fold clip predictions, folds split by clip."""
+def speaker_groups(df, A, y):
+    """Likely-same-speaker groups among the scored clips. Two clips are linked if their WavLM clip embeddings are
+    near-identical (cosine >= 0.98, ~0.1% of random pairs), or their file numbers are within 3 and cosine >= 0.93 (a
+    speaker's answers are usually numbered side by side; only ~1.6% of random pairs are that similar). Most groups are
+    one speaker's 3 answers. Score-0 clips stay on their own: they sound alike because they're mostly noise."""
+    num = df.filename.str.extract(r"(\d+)")[0].astype(int).to_numpy()
+    An = A / np.linalg.norm(A, axis=1, keepdims=True)
+    S, pos = An @ An.T, np.asarray(y) > 0
+    link = (S >= 0.98) | ((np.abs(num[:, None] - num[None, :]) <= 3) & (S >= 0.93))
+    link &= pos[:, None] & pos[None, :]
+    np.fill_diagonal(link, False)
+    return connected_components(csr_matrix(link), directed=False)[1]
+
+
+def speaker_folds(groups, seed=42, k=5):
+    """k folds that never split a speaker group: list of (train_idx, val_idx), usable as cv= anywhere."""
+    return list(GroupKFold(k, shuffle=True, random_state=seed).split(groups, groups=groups))
+
+
+def pieces_cv(pieces, A, H, y, folds):
+    """Out-of-fold clip predictions for the given folds (a list of (train_idx, val_idx))."""
     oof = np.zeros(len(y))
-    for tr, va in cv.split(y):
+    for tr, va in folds:
         oof[va] = predict_pieces(fit_pieces(pieces, A, H, y, tr), pieces, A, H, va)
     return oof
 
@@ -116,15 +140,17 @@ def main():
     H_trn, H_ten = H_tr.to_numpy(), H_te.to_numpy()
     base = [c for c in H_tr.columns if not c.startswith("gec_")]
 
-    cv = KFold(5, shuffle=True, random_state=42)
+    cv = speaker_folds(speaker_groups(train, A_tr, y))
     evaluate("handcrafted (no gec)", H_tr[base].to_numpy(), y, cv)
     evaluate("handcrafted + gec", H_tr.to_numpy(), y, cv)
     evaluate("audio (WavLM)", A_tr, y, cv)
     X_tr = np.hstack([A_tr, H_tr.to_numpy()])
     evaluate("audio + handcrafted Ridge", X_tr, y, cv)
     evaluate("audio + handcrafted SVR (v6)", X_tr, y, cv, make=clip_svr)
-    oof = pieces_cv(P_tr, A_tr, H_trn, y, cv)  # final (v10)
-    print(f"{'pieces SVR (v10, final)':<24} OOF rmse={rmse(y, oof):.4f}  pearson={pearsonr(y, oof)[0]:.4f}")
+    oof = pieces_cv(P_tr, A_tr, H_trn, y, cv)  # final (v15)
+    print(f"{'pieces SVR (v15, final)':<24} OOF rmse={rmse(y, oof):.4f}  pearson={pearsonr(y, oof)[0]:.4f}")
+    leaky = pieces_cv(P_tr, A_tr, H_trn, y, list(KFold(5, shuffle=True, random_state=42).split(y)))
+    print(f"  (same model with folds split by clip, as before: {rmse(y, leaky):.4f} - optimistic, speakers leak across folds)")
     pd.DataFrame({"filename": train.filename, "label": y, "audio": oof}).to_csv("oof_audio.csv", index=False)
 
     every = np.arange(len(y))

@@ -42,7 +42,9 @@ def test_fast_svr_matches_sklearn():
     rng = np.random.default_rng(0)
     X, y = rng.normal(size=(300, 20)) * rng.uniform(0.1, 5, 20), rng.uniform(0, 5, 300)
     m = train.audio_model().fit(X, y)
-    ref = make_pipeline(StandardScaler(), SVR(C=m.C, epsilon=m.epsilon)).fit(X, y)
+    Zs = StandardScaler().fit_transform(X)
+    gamma = m.gamma_scale / (Zs.shape[1] * Zs.var())          # gamma_scale=1 would be sklearn's gamma="scale"
+    ref = make_pipeline(StandardScaler(), SVR(C=m.C, epsilon=m.epsilon, gamma=gamma)).fit(X, y)
     Xn = rng.normal(size=(50, 20))
     assert np.allclose(m.predict(Xn), ref.predict(Xn), atol=1e-9)
     # predict_pieces: median per clip, for clips with different numbers of pieces
@@ -51,6 +53,21 @@ def test_fast_svr_matches_sklearn():
     clips = [2, 0, 1]
     want = [np.clip(np.median(m.predict(train.piece_rows(pieces, A, H, [i]))), 0, 5) for i in clips]
     assert np.allclose(train.predict_pieces(m, pieces, A, H, clips), want, atol=1e-9)
+
+
+def test_speaker_groups_keep_a_speaker_together():
+    import pandas as pd
+    rng = np.random.default_rng(0)
+    voice, other = rng.normal(size=16), rng.normal(size=16)
+    A = np.stack([voice, voice + 0.01, voice + 0.02, other, voice, rng.normal(size=16)])
+    df = pd.DataFrame({"filename": ["audio_10.wav", "audio_11.wav", "audio_12.wav", "audio_40.wav", "audio_90.wav", "audio_91.wav"]})
+    y = np.array([3, 3, 3, 2, 0, 0])            # the last two are score-0 clips
+    g = train.speaker_groups(df, A, y)
+    assert g[0] == g[1] == g[2]                 # same voice, neighbouring files -> one speaker
+    assert g[3] != g[0]                         # different voice, far away
+    assert g[4] != g[0] and g[4] != g[5]        # score-0 clips are never grouped, even with a matching voice
+    for tr, va in train.speaker_folds(g, k=3):  # a group never spans train and validation
+        assert not set(g[tr]) & set(g[va])
 
 
 def test_load_audio_resamples_and_downmixes():

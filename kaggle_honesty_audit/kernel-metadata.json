@@ -1,0 +1,13 @@
+{
+  "id": "vanshrajput29/shl-grammar-honesty-audit",
+  "title": "SHL grammar - honesty audit",
+  "code_file": "honesty_audit_kaggle.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_internet": false,
+  "competition_sources": ["shl-hiring-assessment-2026"],
+  "dataset_sources": ["vanshrajput29/shl-grammar-eval-inputs", "vanshrajput29/shl-grammar-speaker-groups"],
+  "kernel_sources": ["vanshrajput29/shl-grammar-deberta-speaker-folds"]
+}

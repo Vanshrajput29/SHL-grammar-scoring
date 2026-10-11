@@ -36,8 +36,11 @@ MODELS = Path(__file__).parent / "models"
 @lru_cache(maxsize=None)
 def _coedit():
     from transformers import AutoTokenizer, T5ForConditionalGeneration
+    # float16 like the Kaggle run that made the training features (kaggle_gec/): on 227 training sentences it gave the same
+    # corrections as float32, with half the memory and ~1.5x faster. CPUs run float16 slowly, so they keep float32.
+    dtype = torch.float16 if DEVICE == "mps" else torch.float32
     return (AutoTokenizer.from_pretrained("grammarly/coedit-large"),
-            T5ForConditionalGeneration.from_pretrained("grammarly/coedit-large").to(DEVICE).eval())
+            T5ForConditionalGeneration.from_pretrained("grammarly/coedit-large", torch_dtype=dtype).to(DEVICE).eval())
 
 
 @lru_cache(maxsize=None)
