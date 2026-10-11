@@ -1,0 +1,13 @@
+{
+  "id": "vanshrajput29/shl-grammar-nested-handweight",
+  "title": "SHL grammar - nested handweight",
+  "code_file": "nested_handweight_kaggle.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_internet": false,
+  "competition_sources": ["shl-hiring-assessment-2026"],
+  "dataset_sources": ["vanshrajput29/shl-grammar-eval-inputs", "vanshrajput29/shl-grammar-speaker-groups"],
+  "kernel_sources": ["vanshrajput29/shl-grammar-deberta-speaker-folds", "vanshrajput29/shl-grammar-audio-w2vbert"]
+}

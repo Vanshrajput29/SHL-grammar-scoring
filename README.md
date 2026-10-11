@@ -151,6 +151,11 @@ speaker-grouped CV (0.5362 → 0.5339) *and* the public score (0.3466 → 0.3428
 (`kaggle_honesty_audit/`): with scores shuffled between speakers the pipeline does worse than predicting the mean (no leak),
 and choosing the kernel width inside each training fold puts v15's real gain at ~0.001, so part of its public gain is luck.
 
+**Leaning less on the speaker** (`kaggle_speaker_invariant/`, `kaggle_nested_handweight/`): weighting the 13 hand-made
+features up in the SVR kernel looked like a 0.002 gain (×4: 0.5318 vs 0.5339, all 3 splits), but with the weight chosen
+inside each training fold it was 0.5338, so nothing; dropping or subtracting the whole-clip embedding was worse, and later
+WavLM layers helped only slightly at the clip level. Past v15/v16, tuning this pipeline has no real gains left.
+
 **Final picks.** The public leaderboard uses 60% of the test set (~130 clips); the final ranking uses the other 40% (~86
 clips), and Kaggle keeps the better of two chosen submissions. I picked **v15** (best public score, and the model `train.py`
 and `predict.py` run) and **v16** (v15's audio model averaged with a smoother WavLM + w2v-BERT one: the best speaker-grouped CV,
@@ -197,7 +202,7 @@ I ran the heavy parts on Kaggle because my laptop (an M1 MacBook Air) was overhe
    ```
    Also push `kaggle_deberta` and `kaggle_deberta_seeds` (the DeBERTa-base runs): the notebook compares them with the large
    model in section 5. The other `kaggle_*` folders (`kaggle_audio_pieces` (v9), `kaggle_audio_large`, `kaggle_wavlm_finetune`, `kaggle_deberta_large_seeds`, `kaggle_asr_v3`,
-   `kaggle_deberta_large_v3`, `kaggle_ctc_disagreement`, `kaggle_parakeet`, `kaggle_features_v2`, `kaggle_llm_judge`, `kaggle_whisper_encoder`, `kaggle_regularization`, `kaggle_deberta_windows`, `kaggle_audio_augment`, `kaggle_deberta_both_asr`, `kaggle_llm_lora`, `kaggle_audio_w2vbert`, `kaggle_audio_pauses`, `kaggle_deberta_speaker`, `kaggle_tune_speaker`, `kaggle_search_speaker`, `kaggle_honesty_audit`) are experiments that
+   `kaggle_deberta_large_v3`, `kaggle_ctc_disagreement`, `kaggle_parakeet`, `kaggle_features_v2`, `kaggle_llm_judge`, `kaggle_whisper_encoder`, `kaggle_regularization`, `kaggle_deberta_windows`, `kaggle_audio_augment`, `kaggle_deberta_both_asr`, `kaggle_llm_lora`, `kaggle_audio_w2vbert`, `kaggle_audio_pauses`, `kaggle_deberta_speaker`, `kaggle_tune_speaker`, `kaggle_search_speaker`, `kaggle_honesty_audit`, `kaggle_speaker_invariant`, `kaggle_nested_handweight`) are experiments that
    didn't make the final model (notebook section 10); they're optional.
 3. **Download the outputs** with `kaggle kernels output <your-username>/<notebook-name> -p <folder>` into:
    `transcripts/` (unzip `transcripts.zip` there), `gec.json` (project root), `kaggle_out/audio/`, `kaggle_out/audio_pieces_variants/`, `kaggle_out/deberta/`,
