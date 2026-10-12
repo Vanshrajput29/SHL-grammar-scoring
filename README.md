@@ -216,13 +216,17 @@ I ran the heavy parts on Kaggle because my laptop (an M1 MacBook Air) was overhe
 5. **Score any audio file:** `.venv/bin/python predict.py clip.wav` (needs Apple Silicon for local Whisper;
    it downloads about 3 GB of pretrained models the first time). To score many files, pass them all in one call
    (`predict.py a.wav b.wav ...`): each model loads once, scores every file, and is freed before the next one loads, so
-   the first file takes about a minute (mostly loading) and each extra file about 6 s on my 8 GB M1.
+   the first file takes under a minute (mostly loading Whisper) and each extra file about 6 s on my 8 GB M1. The first run
+   also saves a float16 copy of CoEdIT in `models/coedit_fp16/` (1.7 GB), which loads in seconds instead of up to 15 s.
 
 ## What I'd improve with more time
 
 - **Whisper still cleans up some speech.** I can't measure exactly how much without human-written transcripts.
 - **Very few clips score 1–2**, so the model is least accurate there and tends to predict towards the middle.
-- **More data before bigger audio models.** Fine-tuning WavLM overfit here; with more labelled audio it would be worth revisiting.
+- **More labelled speakers.** The audio model's training error (0.15) is far below its error on new speakers (0.60). A
+  learning curve with speaker-grouped folds shows that error still falling as speakers are added (25% → 100% of them:
+  0.695 → 0.597), while stronger regularisation and pseudo-labelling the unlabelled speakers didn't help. So the gap is
+  a shortage of speakers, not a mis-set model, and fine-tuning bigger audio models (which overfit here) would also need more.
 - **The score-0 rule** catches all 37 here, but it's based on very few examples.
 - **Training and test audio differ.** With more audio like the test set, even unscored, I'd first find out what differs
   (microphones, prompts, speakers) and build validation around it, before trying more models.
