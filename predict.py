@@ -39,8 +39,17 @@ def _coedit():
     # float16 like the Kaggle run that made the training features (kaggle_gec/): on 227 training sentences it gave the same
     # corrections as float32, with half the memory and ~1.5x faster. CPUs run float16 slowly, so they keep float32.
     dtype = torch.float16 if DEVICE == "mps" else torch.float32
-    return (AutoTokenizer.from_pretrained("grammarly/coedit-large"),
-            T5ForConditionalGeneration.from_pretrained("grammarly/coedit-large", torch_dtype=dtype).to(DEVICE).eval())
+    if dtype == torch.float32:
+        return (AutoTokenizer.from_pretrained("grammarly/coedit-large"),
+                T5ForConditionalGeneration.from_pretrained("grammarly/coedit-large").to(DEVICE).eval())
+    # The hub copy is stored in float32 (3 GB): loading it reads and converts every weight (4-15 s). A one-time float16
+    # copy in models/ has the same weights and loads in well under a second.
+    local = MODELS / "coedit_fp16"
+    if not local.exists():
+        T5ForConditionalGeneration.from_pretrained("grammarly/coedit-large", torch_dtype=dtype).save_pretrained(local)
+        AutoTokenizer.from_pretrained("grammarly/coedit-large").save_pretrained(local)
+    return (AutoTokenizer.from_pretrained(local),
+            T5ForConditionalGeneration.from_pretrained(local, torch_dtype=dtype).to(DEVICE).eval())
 
 
 @lru_cache(maxsize=None)
